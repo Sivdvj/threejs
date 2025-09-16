@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Particles</title>
+  <style>
+    html, body{
+      margin : 0;
+      height : 100%;
+      background : #000000;
+    }
+    body{
+      overflow-y : scroll;
+    }
+    canvas{
+      display : block;
+      position : fixed;
+      top : 0;
+      left : 0;
+    }
+    #scroll-area{
+      height : 300vh;
+    }
+  </style>
+</head>
+<div id="scroll-area"></div>
+<body>
+  <script type = "module">
+    import * as three from 'https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.module.js';
+    import {gsap} from 'https://cdn.jsdelivr.net/npm/gsap@3.13.0/index.js';
+    import {ScrollTrigger} from 'https://cdn.jsdelivr.net/npm/gsap@3.13.0/ScrollTrigger.js';
+    gsap.registerPlugin(ScrollTrigger);
+
+    //scene, camera, renderer
+    const scene = new three.Scene();
+
+    const camera = new three.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
+    camera.position.z = 250;
+
+    const renderer = new three.WebGLRenderer({antialias:true});
+    renderer.setSize(window.innerWidth, window.innerHeight);
+
+    document.body.appendChild(renderer.domElement);
+
+    //particles setup;
+    const particleCount = 2000;
+    const geometry = new three.BufferGeometry();
+
+    const positions = new Float32Array(particleCount * 3);
+    for(let i=0 ; i<particleCount*3 ; i++){
+      positions[i] = (Math.random() - 0.5) * 500; //split the particles across the 8 quadrants randomly
+    }
+
+    const colors = new Float32Array(particleCount * 3);
+    for(let i=0 ; i<particleCount*3 ; i+=3){
+      colors[i] = Math.random();
+      colors[i+1] = Math.random();
+      colors[i+2] = Math.random(); //random assignment of RGB for each particle
+    }
+
+    geometry.setAttribute('position', new three.BufferAttribute(positions, 3));
+    geometry.setAttribute('color', new three.BufferAttribute(colors, 3));
+
+    const material = new three.PointsMaterial({
+      size : 7,
+      //color : 0x00ffff,
+      vertexColors : true,
+      transparent : true,
+      opacity : 0.8,
+      map : new three.TextureLoader().load('https://threejs.org/examples/textures/sprites/spark1.png'),
+      blending : three.AdditiveBlending,
+      depthWrite : false
+    });
+    const particles = new three.Points(geometry, material);
+    scene.add(particles);
+
+    const basePositions = positions.slice(); //frozen scatter
+
+    function sampleGeometryVertices(geo, count){
+      const arr = new Float32Array(count*3);
+      const v = geo.attributes.position.array;
+      for(let i = 0 ; i < count ; i++){
+        const idx = (i % (v.length / 3)) * 3;
+        arr[i*3] = v[idx];
+        arr[i*3+1] = v[idx+1];
+        arr[i*3+2] = v[idx+2];
+      }
+      return arr;
+    }
+
+    //shapes
+    const cube = sampleGeometryVertices(new three.BoxGeometry(150, 150, 150, 10, 10, 10), particleCount);
+    const sphere = sampleGeometryVertices(new three.SphereGeometry(100, 32, 32), particleCount);
+    const torus = sampleGeometryVertices(new three.TorusGeometry(70, 20, 16, 100), particleCount);
+
+    ScrollTrigger.create({
+      trigger: "#scroll-area",
+      start: "top top",
+      end: "bottom bottom",
+      scrub: true,
+      onUpdate: self => { //runs everytime the scroll updates
+        const progress = self.progress; //progress of scrollbar from 0 to 1
+        const pos = geometry.attributes.position.array;
+
+        let startShape, endShape, localProg;
+
+        if(progress < 0.20){
+            startShape = basePositions;
+            endShape = basePositions;
+            localProg = 0;
+        }else if(progress < 0.33){
+            startShape = basePositions;
+            endShape = cube;
+            localProg = (progress - 0.20) / (0.33 - 0.20); //normalized value - gives the percentage of progress of transition between two shapes
+        }else if(progress < 0.53){
+            startShape = cube;
+            endShape = cube;
+            localProg = 0;
+        }else if(progress < 0.66){
+            startShape = cube;
+            endShape = torus;
+            localProg = (progress - 0.53) / (0.66 - 0.53);
+        }else if(progress < 0.86){
+            startShape = torus;
+            endShape = torus;
+            localProg = 0;
+        }else{
+            startShape = torus;
+            endShape = sphere;
+            localProg = (progress - 0.86) / (1 - 0.86);
+        }
+
+        //to slide between the two shapes
+        for(let i=0 ; i<particleCount*3 ; i++){
+            pos[i] = three.MathUtils.lerp(startShape[i], endShape[i], localProg); //a+(b-a)*t = lerp(a,b,t)
+            //t=0 -> stay at the same shape
+            //t=1 -> move to the next shape
+            //t=0.5 -> halfway between the two shapes
+        }
+        geometry.attributes.position.needsUpdate = true;
+      }
+    });
+    //Animate particles rotation
+    function animate(){
+        requestAnimationFrame(animate);
+        //particles.rotation.y += 0.002;
+        particles.rotation.z += 0.002;
+        renderer.render(scene, camera);
+    }
+    animate();
+
+    //Responsive
+    window.addEventListener('resize', ()=>{
+        camera.aspect = window.innerWidth/window.innerHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+  </script>
+</body>
+</html>

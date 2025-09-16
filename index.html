@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Noise Sphere Particles</title>
+  <style>
+    body{
+        margin: 0; overflow: hidden; background: black;
+        /* filter: invert(1); */
+    }
+    canvas{
+        display: block;
+    }
+  </style>
+</head>
+<body>
+  <script type="module">
+    import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.module.js';
+    import {createNoise3D} from "https://cdn.jsdelivr.net/npm/simplex-noise@4.0.1/dist/esm/simplex-noise.js";
+
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera(60, window.innerWidth/window.innerHeight, 0.1, 1000);
+    camera.position.z = 300;
+
+    const renderer = new THREE.WebGLRenderer({antialias:true});
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    document.body.appendChild(renderer.domElement);
+
+    const particleCount = 3000;
+    const radius = 100;
+    const spatialScale = 0.02; //scaling down particle positions for noise input - to make it more smoother
+    const timeScale = 0.3; //how fast noise evolves over time
+    const amplitude = 5;
+
+    const basePositions = new Float32Array(particleCount * 3); ///r, theta, phi
+    for (let i = 0 ; i < particleCount*3 ; i+=3) {
+      const theta = Math.random() * Math.PI * 2;
+      const phi = Math.acos((Math.random() * 2) - 1);
+      const x = radius * Math.sin(phi) * Math.cos(theta);
+      const y = radius * Math.sin(phi) * Math.sin(theta);
+      const z = radius * Math.cos(phi);
+
+      basePositions[i] = x;
+      basePositions[i+1] = y;
+      basePositions[i+2] = z;
+    }
+
+    const positions = basePositions.slice();
+    const geometry = new THREE.BufferGeometry();
+    geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+
+    const material = new THREE.PointsMaterial({
+      size: 4,
+      color: 0x00ffff,
+      map : new THREE.TextureLoader().load('https://threejs.org/examples/textures/sprites/spark1.png'),
+      transparent: true,
+      opacity: 0.9,
+    });
+
+    const points = new THREE.Points(geometry, material);
+    scene.add(points);
+
+    // noise
+    const noise3D = createNoise3D();
+
+    // animate
+    function animate(){
+      requestAnimationFrame(animate);
+
+      const t = performance.now() * 0.001; //seconds
+      const pos = geometry.attributes.position.array;
+
+      for (let i = 0; i < particleCount*3; i+=3) {
+        const bx = basePositions[i];
+        const by = basePositions[i+1];
+        const bz = basePositions[i+2];
+
+        //displacements with noise
+        const nx = noise3D(bx * spatialScale, by * spatialScale, t * timeScale);
+        const ny = noise3D(by * spatialScale, bz * spatialScale, t * timeScale + 100);
+        const nz = noise3D(bz * spatialScale, bx * spatialScale, t * timeScale + 200);
+
+        pos[i] = bx + nx * amplitude;
+        pos[i+1] = by + ny * amplitude;
+        pos[i+2] = bz + nz * amplitude;
+      }
+
+      geometry.attributes.position.needsUpdate = true;
+
+      points.rotation.y += 0.0015;
+      points.rotation.x += 0.0012;
+      renderer.render(scene, camera);
+    }
+
+    animate();
+
+    window.addEventListener("resize", () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+  </script>
+</body>
+</html>
