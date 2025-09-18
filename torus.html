@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Noise Sphere Particles</title>
+  <style>
+    body{
+        margin: 0; overflow: hidden; background: black;
+    }
+    canvas{
+        display: block;
+    }
+  </style>
+</head>
+<body>
+  <script type="module">
+    import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.module.js';
+    import {createNoise3D, createNoise2D} from "https://cdn.jsdelivr.net/npm/simplex-noise@4.0.1/dist/esm/simplex-noise.js";
+
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera(60, window.innerWidth/window.innerHeight, 0.1, 1000);
+    camera.position.z = 300;
+
+    const renderer = new THREE.WebGLRenderer({antialias:true});
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    document.body.appendChild(renderer.domElement);
+
+    const particleCount = 10000;
+    const R = 80;
+    const r = 50;
+    const spatialScale = 0.02; //scaling down particle positions for noise input - to make it more smoother
+    const timeScale = 0.3; //how fast noise evolves over time
+    const amplitude = 2;
+
+    const basePositions = new Float32Array(particleCount * 3); ///r, theta, phi
+    const uvData = new Float32Array(particleCount * 2);
+    const uvVelData = new Float32Array(particleCount * 2);
+    const flowSpeedU = 0.01;
+    const flowSpeedV = 0.01;
+
+    const noise2D = createNoise2D();
+    const noiseMagnitude = 5;
+
+    let sqrt = Math.sqrt(particleCount)
+    for(let i=0; i<particleCount; i++){
+      const u = 2*Math.PI * (i % sqrt) / sqrt;  // around the big ring
+      const v = 2*Math.PI * (Math.floor((i / sqrt)) / sqrt);  // around the tube
+
+      const x = (R + r*Math.cos(v)) * Math.cos(u);
+      const y = (R + r*Math.cos(v)) * Math.sin(u);
+      const z = r * Math.sin(v);
+
+      basePositions[i*3] = x;
+      basePositions[i*3+1] = y;
+      basePositions[i*3+2] = z;
+
+      // uvData[i*2] = u * Math.random();
+      // uvData[i*2+1] = v * Math.random();
+      // uvVelData[i*2] = (2 * Math.random() - 1) * flowSpeedU;
+      // uvVelData[i*2+1] = (2 * Math.random() - 1) * flowSpeedV;
+      uvData[i*2] = u;
+      uvData[i*2+1] = v;
+      uvVelData[i*2] = noise2D(u / noiseMagnitude, v / noiseMagnitude) * flowSpeedU;
+      uvVelData[i*2+1] = noise2D(u / noiseMagnitude , v / noiseMagnitude) * flowSpeedV;
+    }
+    
+
+    const positions = basePositions.slice();
+    const geometry = new THREE.BufferGeometry();
+    geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+
+    const material = new THREE.PointsMaterial({
+      size: 0.75,
+      color: 0x00ffff,
+      transparent: true,
+      opacity: 0.9
+    });
+
+    const points = new THREE.Points(geometry, material);
+    scene.add(points);
+
+    // noise
+    const noise3D = createNoise3D();
+
+    // animate
+    function animate(){
+      requestAnimationFrame(animate);
+
+      const t = performance.now() * 0.001; //seconds
+      const pos = geometry.attributes.position.array;
+
+      for (let i = 0; i < particleCount; i++) {
+        // let u = uvData[i*2] + t * flowSpeedU;   // orbit around major radius
+        // let v = uvData[i*2+1] + t * flowSpeedV; // spiral around minor radius
+        uvData[i*2] += uvVelData[i*2];
+        uvData[i*2+1] += uvVelData[i*2+1];
+        let u = uvData[i*2];
+        let v = uvData[i*2 + 1];
+
+        const bx = (R + r * Math.cos(v)) * Math.cos(u);
+        const by = (R + r * Math.cos(v)) * Math.sin(u);
+        const bz = r * Math.sin(v);
+
+        //displacements with noise
+        const nx = noise3D(bx * spatialScale, by * spatialScale, t * timeScale);
+        const ny = noise3D(by * spatialScale, bz * spatialScale, t * timeScale + 100);
+        const nz = noise3D(bz * spatialScale, bx * spatialScale, t * timeScale + 200);
+
+        pos[i*3] = bx + nx * amplitude;
+        pos[i*3+1] = by + ny * amplitude;
+        pos[i*3+2] = bz + nz * amplitude;
+      }
+
+      geometry.attributes.position.needsUpdate = true;
+      
+      
+      renderer.render(scene, camera);
+    }
+
+    animate();
+
+    window.addEventListener("resize", () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+  </script>
+</body>
+</html>
