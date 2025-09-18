@@ -25,7 +25,7 @@
     renderer.setSize(window.innerWidth, window.innerHeight);
     document.body.appendChild(renderer.domElement);
 
-    const particleCount = 10000;
+    const particleCount = 50000;
     const R = 80;
     const r = 50;
     const spatialScale = 0.02; //scaling down particle positions for noise input - to make it more smoother
@@ -70,10 +70,12 @@
     geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
 
     const material = new THREE.PointsMaterial({
-      size: 0.75,
+      size: 2.5,
       color: 0x00ffff,
+      map : new THREE.TextureLoader().load('https://threejs.org/examples/textures/sprites/spark1.png'),
+      blending: THREE.AdditiveBlending,
       transparent: true,
-      opacity: 0.9
+      opacity: 1
     });
 
     const points = new THREE.Points(geometry, material);
