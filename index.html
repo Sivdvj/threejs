@@ -12,6 +12,7 @@
 </head>
 <body>
   <div id="scroll-area"></div>
+  <div id="wrapper" style="position:fixed; top:0; left:0; pointer-events:none;"></div>
 
   <script type="module">
     import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.module.js";
@@ -25,7 +26,8 @@
     camera.position.z = 250;
     let renderer = new THREE.WebGLRenderer({ antialias: true });
     renderer.setSize(innerWidth, innerHeight);
-    document.body.appendChild(renderer.domElement);
+    const wrapper = document.getElementById("wrapper");
+    wrapper.appendChild(renderer.domElement);
 
     let particleCount = 50000;
     let geometry = new THREE.BufferGeometry();
@@ -199,6 +201,11 @@
       onUpdate(self) { scrollProgress = self.progress; }
     });
 
+    
+    let offsetX = 0;
+    let offsetY = 0;
+    let targetX = 0;
+    let targetY = 0;
     let tprev = performance.now() * 0.001;
     function animate() {
       requestAnimationFrame(animate);
@@ -253,15 +260,30 @@
       }
       geometry.attributes.position.needsUpdate = true;
 
+      offsetX += (targetX - offsetX) * 0.05
+      offsetY += (targetY - offsetY) * 0.05
 
+      wrapper.style.transform = `translate(calc(-50% + ${offsetX}px), calc(-50% + ${offsetY}px))`;
       renderer.render(scene, camera);
     }
     animate();
+
+
+
     window.addEventListener("resize", () => {
       camera.aspect = innerWidth / innerHeight;
       camera.updateProjectionMatrix();
       renderer.setSize(innerWidth, innerHeight);
     });
+
+    window.addEventListener("mousemove", (e) => {
+      let x = e.clientX - window.innerWidth / 2;
+      let y = e.clientY - window.innerHeight / 2;
+
+      targetX = x * -0.06; 
+      targetY = y * -0.06;
+    });
+
   </script>
 </body>
 </html>
