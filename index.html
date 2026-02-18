@@ -39,7 +39,40 @@
         createNoise2D,
         createNoise3D,
       } from "https://cdn.jsdelivr.net/npm/simplex-noise@4.0.1/dist/esm/simplex-noise.js";
+      import { GUI } from "https://cdn.jsdelivr.net/npm/dat.gui@0.7.9/build/dat.gui.module.js";
+
       gsap.registerPlugin(ScrollTrigger);
+
+      const defaults = {
+        particleColor: "#ff8800",
+        rotationSpeed: 1.0,
+        noiseAmplitude: 2.0,
+      };
+
+      const params = {
+        particleColor: defaults.particleColor,
+        rotationSpeed: defaults.rotationSpeed,
+        noiseAmplitude: defaults.noiseAmplitude,
+        reset: function() {
+          this.particleColor = defaults.particleColor;
+          this.rotationSpeed = defaults.rotationSpeed;
+          this.noiseAmplitude = defaults.noiseAmplitude;
+          
+          if(typeof material !== 'undefined') {
+             material.color.set(this.particleColor);
+          }
+          
+          gui.updateDisplay();
+        }
+      };
+
+      const gui = new GUI();
+      gui.addColor(params, "particleColor").onChange((v) => {
+        material.color.set(v);
+      });
+      gui.add(params, "rotationSpeed", 0, 5).name("Speed");
+      gui.add(params, "noiseAmplitude", 0, 10).name("Noise Amp");
+      gui.add(params, "reset").name("Revert Defaults");
 
       let scene = new THREE.Scene();
       let camera = new THREE.PerspectiveCamera(
@@ -104,7 +137,7 @@
       function updateScatter(time) {
         let spatialScale = 0.02,
           timeScale = 0.3,
-          amplitude = 3;
+          amplitude = params.noiseAmplitude;
         for (let i = 0; i < particleCount; i++) {
           let x = scatterBase[i * 3];
           let y = scatterBase[i * 3 + 1];
@@ -164,7 +197,7 @@
       function updateTorus(time) {
         let spatialScale = 0.02,
           timeScale = 0.3,
-          amplitude = 2;
+          amplitude = params.noiseAmplitude;
         for (let i = 0; i < particleCount; i++) {
           torusUV[i * 2] += torusVel[i * 2];
           torusUV[i * 2 + 1] += torusVel[i * 2 + 1];
@@ -229,7 +262,7 @@
       function updateSphere(time) {
         let spatialScale = 0.02,
           timeScale = 0.3,
-          amplitude = 2;
+          amplitude = params.noiseAmplitude;
         for (let i = 0; i < particleCount; i++) {
           sphereUV[i * 2] += sphereVel[i * 2];
           sphereUV[i * 2 + 1] += sphereVel[i * 2 + 1];
@@ -279,10 +312,19 @@
       let offsetY = 0;
       let targetX = 0;
       let targetY = 0;
-      let tprev = performance.now() * 0.001;
+      let lastTime = performance.now() * 0.001;
+      let currentTime = 0;
+
       function animate() {
         requestAnimationFrame(animate);
-        let t = performance.now() * 0.001;
+
+        let now = performance.now() * 0.001;
+        let delta = now - lastTime;
+        lastTime = now;
+
+        currentTime += delta * params.rotationSpeed;
+        let t = currentTime;
+
         // let tdelta = t - tprev;
         // tprev = t;
         // let tfactor = tdelta / (1/60);
